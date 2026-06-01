@@ -1185,6 +1185,34 @@
 
     .form-success.show { display: block; }
 
+    .form-error {
+      display: none;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: #ff6b8a;
+      padding: 1rem;
+      border: 1px solid rgba(255, 107, 138, 0.35);
+      border-radius: 4px;
+      background: rgba(255, 107, 138, 0.08);
+      margin-top: 1rem;
+    }
+
+    .form-error.show { display: block; }
+
+    .btn.is-loading {
+      opacity: 0.75;
+      pointer-events: none;
+    }
+
+    .hp-field {
+      position: absolute;
+      left: -9999px;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
     /* ── Footer ── */
     footer {
       border-top: 1px solid var(--border);
@@ -1581,7 +1609,11 @@
             <a href="viber://chat" class="social-link" target="_blank" rel="noopener">📱 Viber</a>
           </div>
         </div>
-        <form class="contact-form reveal reveal-right" id="contactForm">
+        <form class="contact-form reveal reveal-right" id="contactForm" novalidate>
+          <div class="hp-field" aria-hidden="true">
+            <label for="website">Website</label>
+            <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+          </div>
           <div class="form-group">
             <label for="name">Name</label>
             <input type="text" id="name" name="name" required placeholder="Your full name">
@@ -1603,8 +1635,9 @@
             <label for="message">Message</label>
             <textarea id="message" name="message" required placeholder="Tell me about your project or issue..."></textarea>
           </div>
-          <button type="submit" class="btn btn-cyan magnetic">Send Message</button>
+          <button type="submit" class="btn btn-cyan magnetic" id="submitBtn">Send Message</button>
           <div class="form-success" id="formSuccess">✓ Message sent! I'll get back to you soon.</div>
+          <div class="form-error" id="formError"></div>
         </form>
       </div>
     </div>
@@ -1911,13 +1944,72 @@
       });
     });
 
-    /* ── Contact form ── */
-    document.getElementById('contactForm').addEventListener('submit', e => {
+    /* ── Contact form → Google Apps Script ── */
+  (function () {
+    // Paste your Web App URL here after deploying apps-script/PortfolioContact.gs
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbysZ3jW-DIWjRVUvQ-FR5e7ER1yUo_p94u38FUzDLRR7xIv6tZoJw1BPUytuI45w9W_ZA/exec';
+
+    const form = document.getElementById('contactForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const formSuccess = document.getElementById('formSuccess');
+    const formError = document.getElementById('formError');
+    const defaultBtnText = submitBtn.textContent;
+
+    function showSuccess() {
+      formError.classList.remove('show');
+      formSuccess.classList.add('show');
+      setTimeout(() => formSuccess.classList.remove('show'), 6000);
+    }
+
+    function showError(msg) {
+      formSuccess.classList.remove('show');
+      formError.textContent = msg;
+      formError.classList.add('show');
+    }
+
+    form.addEventListener('submit', async e => {
       e.preventDefault();
-      document.getElementById('formSuccess').classList.add('show');
-      e.target.reset();
-      setTimeout(() => document.getElementById('formSuccess').classList.remove('show'), 5000);
+
+      if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('PASTE_YOUR')) {
+        showError('Form is not configured yet. Add your Apps Script Web App URL in index.html.');
+        return;
+      }
+
+      const payload = new URLSearchParams({
+        name: document.getElementById('name').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        service: document.getElementById('service').value,
+        message: document.getElementById('message').value.trim(),
+        website: document.getElementById('website').value
+      });
+
+      submitBtn.classList.add('is-loading');
+      submitBtn.textContent = 'Sending...';
+      formError.classList.remove('show');
+
+      try {
+        const res = await fetch(APPS_SCRIPT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: payload.toString()
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          form.reset();
+          showSuccess();
+        } else {
+          showError(data.error || 'Something went wrong. Please try again.');
+        }
+      } catch (err) {
+        showError('Could not send message. Check your connection or try again later.');
+      } finally {
+        submitBtn.classList.remove('is-loading');
+        submitBtn.textContent = defaultBtnText;
+      }
     });
+  })();
   </script>
 </body>
 </html>
